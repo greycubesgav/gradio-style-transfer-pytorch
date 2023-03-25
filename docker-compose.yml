@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  styletransfer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: greycubesgav/st-pytorch
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+    volumes:
+      - ./data/models/vgg19-dcbb9e9d.pth:/home/pythonapp/.cache/torch/hub/checkpoints/vgg19-dcbb9e9d.pth
+      - ./data:/home/pythonapp/data
+    ports:
+      - "9081:8080"
+    user: "1000:1000"

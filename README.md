@@ -1,3 +1,28 @@
+# docker style-transfer-pytorch
+
+An updated implementation of Katherine Crowson's (https://github.com/crowsonkb) style-transfer-pytorch (https://github.com/crowsonkb/style-transfer-pytorch).
+
+This adds Docker support to aid in running the implementation within a docker container. The docker container includes all requirements to run the implementation against an nvidia card.
+## Usage
+
+```bash
+# Clone the repository
+git clone git@github.com:greycubesgav/gradio-style-transfer-pytorch.git
+
+# Change to the docker branch
+cd gradio-style-transfer-pytorch
+git checkout docker
+
+# Download the model used within the style transfer to the data/models directory
+./download_model.sh
+
+# Place input and style files within the ./data/input and ./data/styles directories
+# Run the style transfer module against an input file, a chosen style and give an output file to write to.
+docker-compose run styletransfer -c "python -m style_transfer.cli --output data/output/result.png data/input/image.jpg data/styles/style.jpg"
+
+# The resulting output file contains the style transfered file
+```
+
 # style-transfer-pytorch
 
 An implementation of neural style transfer ([A Neural Algorithm of Artistic Style](https://arxiv.org/abs/1508.06576)) in PyTorch, supporting CPUs and Nvidia GPUs. It does automatic multi-scale (coarse-to-fine) stylization to produce high-quality high resolution stylizations, even up to print resolution if the GPUs have sufficient memory. If two GPUs are available, they can both be used to increase the maximum resolution. (Using two GPUs is not faster than using one.)
