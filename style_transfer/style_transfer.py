@@ -1,5 +1,6 @@
 """Neural style transfer (https://arxiv.org/abs/1508.06576) in PyTorch."""
 
+import random
 import copy
 from dataclasses import dataclass
 from functools import partial
@@ -15,9 +16,10 @@ from torchvision import models, transforms
 from torchvision.transforms import functional as TF
 
 
+poolings = {'max': nn.MaxPool2d, 'average': nn.AvgPool2d, 'l2': partial(nn.LPPool2d, 2)}
+pooling_scales = {'max': 1., 'average': 2., 'l2': 0.78}
+
 class VGGFeatures(nn.Module):
-    poolings = {'max': nn.MaxPool2d, 'average': nn.AvgPool2d, 'l2': partial(nn.LPPool2d, 2)}
-    pooling_scales = {'max': 1., 'average': 2., 'l2': 0.78}
 
     def __init__(self, layers, pooling='max'):
         super().__init__()
@@ -30,13 +32,21 @@ class VGGFeatures(nn.Module):
 
         # The PyTorch pre-trained VGG-19 has different parameters from Simonyan et al.'s original
         # model.
-        self.model = models.vgg19(pretrained=True).features[:self.layers[-1] + 1]
+        #self.model = models.vgg19(pretrained=True).features[:self.layers[-1] + 1]
+        #self.model = models.vgg19(weights='VGG19_Weights.IMAGENET1K_V1').features[:self.layers[-1] + 1]
+        self.model = models.vgg19(weights=models.VGG19_Weights.DEFAULT).features[:self.layers[-1] + 1]
         self.devices = [torch.device('cpu')] * len(self.model)
 
         # Reduces edge artifacts.
         self.model[0] = self._change_padding_mode(self.model[0], 'replicate')
 
-        pool_scale = self.pooling_scales[pooling]
+        #pool_scale = self.pooling_scales[pooling]
+        pool_scale = pooling_scales[pooling]
+
+        # if pooling != 'max':
+        #     self.model = [Scale(poolings[pooling](2), pool_scale) if isinstance(layer,
+        #         nn.MaxPool2d) else layer for layer in self.model]
+
         for i, layer in enumerate(self.model):
             if pooling != 'max' and isinstance(layer, nn.MaxPool2d):
                 # Changing the pooling type from max results in the scale of activations
@@ -304,7 +314,31 @@ class StyleTransfer:
                 init: str = 'content',
                 style_scale_fac: float = 1.,
                 style_size: int = None,
+                random_seed: int = 43856,
                 callback=None):
+
+        #print(f'Random ({random_seed}')
+
+        # Debug outputs
+        print('style_weights:', style_weights)
+        print('content_weight:', content_weight)
+        print('tv_weight:', tv_weight)
+        print('min_scale:', min_scale)
+        print('end_scale:', end_scale)
+        print('iterations:', iterations)
+        print('initial_iterations:', initial_iterations)
+        print('step_size:', step_size)
+        print('avg_decay:', avg_decay)
+        print('style_scale_fac:', style_scale_fac)
+        print('style_size:', style_size)
+        print('random_seed:', random_seed)
+
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
         min_scale = min(min_scale, end_scale)
         content_weights = [content_weight / len(self.content_layers)] * len(self.content_layers)
@@ -393,6 +427,8 @@ class StyleTransfer:
             if self.devices[0].type == 'cuda':
                 torch.cuda.empty_cache()
 
+            print('Running:')
+
             actual_its = initial_iterations if scale == scales[0] else iterations
             for i in range(1, actual_its + 1):
                 feats = self.model(self.image)
@@ -411,9 +447,11 @@ class StyleTransfer:
                             gpu_ram = max(gpu_ram, torch.cuda.max_memory_allocated(device))
                     callback(STIterate(w=cw, h=ch, i=i, i_max=actual_its, loss=loss.item(),
                                        time=time.time(), gpu_ram=gpu_ram))
+                #yield self.get_image()
 
             # Initialize each new scale with the previous scale's averaged iterate.
             with torch.no_grad():
                 self.image.copy_(self.average.get())
 
         return self.get_image()
+        #yield self.get_image()
