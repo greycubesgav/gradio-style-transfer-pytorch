@@ -5,3 +5,4 @@ out.*
 trace.json
 *.egg-info
 vgg19-dcbb9e9d.pth
+.DS_Store
